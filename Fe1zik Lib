@@ -1,0 +1,919 @@
+-- =====================================================================
+-- BBS-UI LIBRARY v1.0
+-- Простая, стабильная UI-библиотека для Roblox-скриптов.
+-- Автор: сгенерировано для Fe1zik (BBS Rebirth)
+-- =====================================================================
+local BBS = {}
+BBS.__index = BBS
+
+-- ============================ THEMES ============================
+local THEMES = {
+    Amethyst = {
+        Background = Color3.fromRGB(24, 18, 32),
+        Accent = Color3.fromRGB(155, 89, 182),
+        Text = Color3.fromRGB(240, 240, 240),
+        SubText = Color3.fromRGB(180, 180, 190),
+        Element = Color3.fromRGB(38, 30, 48),
+        ElementHover = Color3.fromRGB(50, 40, 62),
+        Toggle = Color3.fromRGB(155, 89, 182),
+        ToggleOff = Color3.fromRGB(70, 60, 80),
+    },
+    Dark = {
+        Background = Color3.fromRGB(20, 20, 20),
+        Accent = Color3.fromRGB(80, 160, 240),
+        Text = Color3.fromRGB(240, 240, 240),
+        SubText = Color3.fromRGB(160, 160, 160),
+        Element = Color3.fromRGB(32, 32, 32),
+        ElementHover = Color3.fromRGB(45, 45, 45),
+        Toggle = Color3.fromRGB(80, 160, 240),
+        ToggleOff = Color3.fromRGB(60, 60, 60),
+    },
+    Light = {
+        Background = Color3.fromRGB(240, 240, 245),
+        Accent = Color3.fromRGB(60, 120, 220),
+        Text = Color3.fromRGB(30, 30, 30),
+        SubText = Color3.fromRGB(90, 90, 90),
+        Element = Color3.fromRGB(220, 220, 230),
+        ElementHover = Color3.fromRGB(205, 205, 215),
+        Toggle = Color3.fromRGB(60, 120, 220),
+        ToggleOff = Color3.fromRGB(190, 190, 200),
+    },
+    Rose = {
+        Background = Color3.fromRGB(38, 20, 28),
+        Accent = Color3.fromRGB(240, 100, 140),
+        Text = Color3.fromRGB(250, 240, 245),
+        SubText = Color3.fromRGB(200, 170, 180),
+        Element = Color3.fromRGB(50, 28, 38),
+        ElementHover = Color3.fromRGB(65, 38, 50),
+        Toggle = Color3.fromRGB(240, 100, 140),
+        ToggleOff = Color3.fromRGB(80, 50, 60),
+    },
+    Ocean = {
+        Background = Color3.fromRGB(15, 28, 40),
+        Accent = Color3.fromRGB(40, 180, 220),
+        Text = Color3.fromRGB(230, 245, 250),
+        SubText = Color3.fromRGB(160, 190, 200),
+        Element = Color3.fromRGB(22, 40, 56),
+        ElementHover = Color3.fromRGB(32, 55, 74),
+        Toggle = Color3.fromRGB(40, 180, 220),
+        ToggleOff = Color3.fromRGB(40, 60, 80),
+    },
+    Blood = {
+        Background = Color3.fromRGB(28, 10, 10),
+        Accent = Color3.fromRGB(200, 40, 40),
+        Text = Color3.fromRGB(245, 230, 230),
+        SubText = Color3.fromRGB(190, 150, 150),
+        Element = Color3.fromRGB(45, 18, 18),
+        ElementHover = Color3.fromRGB(62, 25, 25),
+        Toggle = Color3.fromRGB(200, 40, 40),
+        ToggleOff = Color3.fromRGB(80, 40, 40),
+    },
+}
+
+-- ============================ UTILS ============================
+local function create(className, props)
+    local obj = Instance.new(className)
+    for k, v in pairs(props or {}) do
+        obj[k] = v
+    end
+    return obj
+end
+
+local function corner(parent, radius)
+    return create("UICorner", {
+        CornerRadius = UDim.new(0, radius or 6),
+        Parent = parent,
+    })
+end
+
+local function stroke(parent, color, thickness)
+    return create("UIStroke", {
+        Color = color or Color3.fromRGB(0, 0, 0),
+        Thickness = thickness or 1,
+        Transparency = 0.5,
+        Parent = parent,
+    })
+end
+
+-- ============================ NOTIFY SYSTEM ============================
+local notifyHolder
+local function getNotifyHolder()
+    if notifyHolder and notifyHolder.Parent then return notifyHolder end
+    local gui = create("ScreenGui", {
+        Name = "BBS_Notify",
+        ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+        Parent = game:GetService("CoreGui"),
+    })
+    notifyHolder = gui
+    return gui
+end
+
+-- ============================ WINDOW ============================
+function BBS.new(config)
+    local self = setmetatable({}, BBS)
+
+    self.Config = config or {}
+    self.ThemeName = self.Config.Theme or "Amethyst"
+    self.Theme = THEMES[self.ThemeName]
+    self.MinimizeKey = self.Config.MinimizeKey or Enum.KeyCode.LeftControl
+    self.Transparency = self.Config.Transparency or 0
+
+    self.Tabs = {}
+    self.Connections = {}
+    self.Elements = {}
+    self.ScreenGui = nil
+    self.MainFrame = nil
+    self.ActiveTab = nil
+    self.Minimized = false
+
+    self:Build()
+    self:BindKeys()
+    return self
+end
+
+function BBS:Build()
+    local gui = create("ScreenGui", {
+        Name = "BBS_UI",
+        ResetOnSpawn = false,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+        Parent = game:GetService("CoreGui"),
+    })
+    self.ScreenGui = gui
+
+    -- Главный фрейм
+    local main = create("Frame", {
+        Name = "Main",
+        Size = UDim2.fromOffset(600, 420),
+        Position = UDim2.new(0.5, -300, 0.5, -210),
+        BackgroundColor3 = self.Theme.Background,
+        BorderSizePixel = 0,
+        Active = true,
+        Draggable = true,
+        Parent = gui,
+    })
+    corner(main, 10)
+    stroke(main, self.Theme.Accent, 1.5)
+    self.MainFrame = main
+
+    -- Topbar
+    local topbar = create("Frame", {
+        Name = "Topbar",
+        Size = UDim2.new(1, 0, 0, 36),
+        BackgroundColor3 = self.Theme.Element,
+        BorderSizePixel = 0,
+        Parent = main,
+    })
+    corner(topbar, 10)
+    -- Нижняя часть скругления убираем (маскируем)
+    local topbarMask = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 10),
+        Position = UDim2.new(0, 0, 1, -10),
+        BackgroundColor3 = self.Theme.Element,
+        BorderSizePixel = 0,
+        Parent = topbar,
+    })
+
+    -- Title
+    create("TextLabel", {
+        Name = "Title",
+        Size = UDim2.new(1, -100, 1, 0),
+        Position = UDim2.fromOffset(16, 0),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = self.Config.Title or "BBS UI",
+        TextColor3 = self.Theme.Text,
+        TextSize = 16,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = topbar,
+    })
+
+    -- Subtitle
+    create("TextLabel", {
+        Name = "Subtitle",
+        Size = UDim2.new(1, -100, 1, 0),
+        Position = UDim2.fromOffset(16, 0),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = self.Config.SubTitle or "",
+        TextColor3 = self.Theme.SubText,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = topbar,
+    })
+
+    -- Кнопка минимизации
+    local minBtn = create("TextButton", {
+        Name = "Minimize",
+        Size = UDim2.fromOffset(28, 28),
+        Position = UDim2.new(1, -36, 0, 4),
+        BackgroundColor3 = self.Theme.ElementHover,
+        Text = "-",
+        TextColor3 = self.Theme.Text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 16,
+        Parent = topbar,
+    })
+    corner(minBtn, 6)
+
+    minBtn.MouseButton1Click:Connect(function()
+        self:ToggleMinimize()
+    end)
+
+    -- Sidebar (табы)
+    local sidebar = create("Frame", {
+        Name = "Sidebar",
+        Size = UDim2.new(0, 140, 1, -36),
+        Position = UDim2.fromOffset(0, 36),
+        BackgroundColor3 = self.Theme.Background,
+        BorderSizePixel = 0,
+        Parent = main,
+    })
+
+    local sidebarPad = create("UIPadding", {
+        PaddingTop = UDim.new(0, 8),
+        PaddingLeft = UDim.new(0, 8),
+        PaddingRight = UDim.new(0, 8),
+        Parent = sidebar,
+    })
+
+    local sidebarList = create("Frame", {
+        Name = "List",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Parent = sidebar,
+    })
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 4),
+        Parent = sidebarList,
+    })
+    self.SidebarList = sidebarList
+
+    -- Контент (вкладки)
+    local content = create("Frame", {
+        Name = "Content",
+        Size = UDim2.new(1, -140, 1, -36),
+        Position = UDim2.fromOffset(140, 36),
+        BackgroundColor3 = self.Theme.Background,
+        BorderSizePixel = 0,
+        Parent = main,
+    })
+
+    local contentPad = create("UIPadding", {
+        PaddingTop = UDim.new(0, 8),
+        PaddingLeft = UDim.new(0, 8),
+        PaddingRight = UDim.new(0, 8),
+        PaddingBottom = UDim.new(0, 8),
+        Parent = content,
+    })
+
+    self.ContentFrame = content
+
+    -- Применяем прозрачность
+    self:ApplyTransparency()
+end
+
+function BBS:BindKeys()
+    local UIS = game:GetService("UserInputService")
+    self.KeyConnection = UIS.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.KeyCode == self.MinimizeKey then
+            self:ToggleMinimize()
+        end
+    end)
+end
+
+function BBS:ToggleMinimize()
+    if not self.MainFrame then return end
+    self.Minimized = not self.Minimized
+    if self.Minimized then
+        -- Сохраняем позицию и размер
+        self._lastSize = self.MainFrame.Size
+        self._lastPosition = self.MainFrame.Position
+        self.MainFrame:TweenSize(
+            UDim2.fromOffset(600, 36),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Quad,
+            0.15,
+            true
+        )
+    else
+        self.MainFrame:TweenSize(
+            self._lastSize or UDim2.fromOffset(600, 420),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Quad,
+            0.15,
+            true
+        )
+    end
+end
+
+function BBS:SetMinimizeKey(keyCode)
+    self.MinimizeKey = keyCode
+    getgenv().BBS_UI = getgenv().BBS_UI or {}
+    getgenv().BBS_UI.MinimizeKey = keyCode
+end
+
+function BBS:SetTheme(themeName)
+    if not THEMES[themeName] then return end
+    self.ThemeName = themeName
+    self.Theme = THEMES[themeName]
+    getgenv().BBS_UI = getgenv().BBS_UI or {}
+    getgenv().BBS_UI.Theme = themeName
+    self:RefreshTheme()
+end
+
+function BBS:RefreshTheme()
+    local T = self.Theme
+    if not self.MainFrame then return end
+    self.MainFrame.BackgroundColor3 = T.Background
+
+    -- Обновляем все элементы
+    for _, obj in ipairs(self.ScreenGui:GetDescendants()) do
+        if obj:IsA("TextLabel") then
+            if obj.Name == "SubText" then
+                obj.TextColor3 = T.SubText
+            else
+                obj.TextColor3 = T.Text
+            end
+        end
+        if obj:IsA("TextButton") then
+            obj.TextColor3 = T.Text
+        end
+    end
+end
+
+function BBS:SetTransparency(value)
+    self.Transparency = value
+    getgenv().BBS_UI = getgenv().BBS_UI or {}
+    getgenv().BBS_UI.Transparency = value
+    self:ApplyTransparency()
+end
+
+function BBS:ApplyTransparency()
+    if not self.MainFrame then return end
+    -- Прозрачность фона окна
+    local a = (self.Transparency or 0) / 100 * 0.6
+    self.MainFrame.BackgroundTransparency = math.clamp(a, 0, 0.7)
+end
+
+function BBS:Notify(cfg)
+    local holder = getNotifyHolder()
+    local T = self.Theme
+
+    local frame = create("Frame", {
+        Size = UDim2.fromOffset(280, 60),
+        Position = UDim2.new(1, -300, 0, 20 + (#holder:GetChildren() - 1) * 70),
+        BackgroundColor3 = T.Background,
+        BorderSizePixel = 0,
+        Parent = holder,
+    })
+    corner(frame, 8)
+    stroke(frame, T.Accent, 1.5)
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -16, 0, 22),
+        Position = UDim2.fromOffset(12, 8),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = cfg.Title or "Notification",
+        TextColor3 = T.Text,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame,
+    })
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -16, 0, 20),
+        Position = UDim2.fromOffset(12, 30),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = cfg.Content or "",
+        TextColor3 = T.SubText,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame,
+    })
+
+    task.delay(cfg.Duration or 3, function()
+        if frame and frame.Parent then
+            frame:Destroy()
+        end
+    end)
+end
+
+-- ============================ TAB ============================
+function BBS:AddTab(config)
+    local tab = {
+        Name = config.Title or "Tab",
+        Icon = config.Icon or "",
+        Container = nil,
+        Button = nil,
+        Parent = self,
+    }
+
+    -- Кнопка в sidebar
+    local btn = create("TextButton", {
+        Name = "Tab_" .. tab.Name,
+        Size = UDim2.new(1, 0, 0, 32),
+        BackgroundColor3 = self.Theme.Element,
+        BackgroundTransparency = 0.4,
+        Text = "  " .. tab.Name,
+        TextColor3 = self.Theme.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.SidebarList,
+    })
+    corner(btn, 6)
+    tab.Button = btn
+
+    -- Контейнер контента
+    local container = create("ScrollingFrame", {
+        Name = "Content_" .. tab.Name,
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 4,
+        ScrollBarImageColor3 = self.Theme.Accent,
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        Visible = false,
+        Parent = self.ContentFrame,
+    })
+    create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6),
+        Parent = container,
+    })
+    create("UIPadding", {
+        PaddingRight = UDim.new(0, 6),
+        Parent = container,
+    })
+    tab.Container = container
+
+    -- Клик
+    btn.MouseButton1Click:Connect(function()
+        self:SelectTab(tab)
+    end)
+
+    table.insert(self.Tabs, tab)
+    if #self.Tabs == 1 then
+        self:SelectTab(tab)
+    end
+
+    return tab
+end
+
+function BBS:SelectTab(tab)
+    if self.ActiveTab then
+        self.ActiveTab.Container.Visible = false
+        self.ActiveTab.Button.BackgroundTransparency = 0.4
+    end
+    self.ActiveTab = tab
+    tab.Container.Visible = true
+    tab.Button.BackgroundTransparency = 0
+end
+
+-- ============================ SECTION ============================
+function BBS:AddSection(tab, title)
+    local frame = create("Frame", {
+        Name = "Section_" .. title,
+        Size = UDim2.new(1, 0, 0, 26),
+        BackgroundTransparency = 1,
+        Parent = tab.Container,
+    })
+    create("TextLabel", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = title,
+        TextColor3 = self.Theme.Accent,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame,
+    })
+    return frame
+end
+
+-- ============================ TOGGLE ============================
+function BBS:AddToggle(tab, config)
+    local T = self.Theme
+    local state = config.Default or false
+
+    local frame = create("Frame", {
+        Name = "Toggle_" .. (config.Title or "T"),
+        Size = UDim2.new(1, 0, 0, 32),
+        BackgroundColor3 = T.Element,
+        BackgroundTransparency = 0.3,
+        Parent = tab.Container,
+    })
+    corner(frame, 6)
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -70, 1, 0),
+        Position = UDim2.fromOffset(12, 0),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = config.Title or "Toggle",
+        TextColor3 = T.Text,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame,
+    })
+
+    -- Кнопка toggle
+    local toggleBtn = create("Frame", {
+        Size = UDim2.fromOffset(40, 20),
+        Position = UDim2.new(1, -52, 0.5, -10),
+        BackgroundColor3 = state and T.Toggle or T.ToggleOff,
+        Parent = frame,
+    })
+    corner(toggleBtn, 10)
+
+    local knob = create("Frame", {
+        Size = UDim2.fromOffset(16, 16),
+        Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        Parent = toggleBtn,
+    })
+    corner(knob, 8)
+
+    local btn = create("TextButton", {
+        Size = UDim2.fromOffset(40, 20),
+        Position = UDim2.new(1, -52, 0.5, -10),
+        BackgroundTransparency = 1,
+        Text = "",
+        Parent = frame,
+    })
+
+    local callback = config.Callback or function() end
+
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        toggleBtn.BackgroundColor3 = state and T.Toggle or T.ToggleOff
+        knob.Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+        callback(state)
+    end)
+
+    return {
+        Set = function(v)
+            state = v
+            toggleBtn.BackgroundColor3 = v and T.Toggle or T.ToggleOff
+            knob.Position = v and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+            callback(v)
+        end,
+        Get = function() return state end,
+    }
+end
+
+-- ============================ BUTTON ============================
+function BBS:AddButton(tab, config)
+    local T = self.Theme
+    local frame = create("TextButton", {
+        Name = "Button_" .. (config.Title or "B"),
+        Size = UDim2.new(1, 0, 0, 32),
+        BackgroundColor3 = T.Element,
+        BackgroundTransparency = 0.3,
+        Text = config.Title or "Button",
+        TextColor3 = T.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 13,
+        Parent = tab.Container,
+    })
+    corner(frame, 6)
+
+    frame.MouseEnter:Connect(function()
+        frame.BackgroundColor3 = T.ElementHover
+        frame.BackgroundTransparency = 0.15
+    end)
+    frame.MouseLeave:Connect(function()
+        frame.BackgroundColor3 = T.Element
+        frame.BackgroundTransparency = 0.3
+    end)
+
+    if config.Callback then
+        frame.MouseButton1Click:Connect(config.Callback)
+    end
+
+    return frame
+end
+
+-- ============================ INPUT ============================
+function BBS:AddInput(tab, config)
+    local T = self.Theme
+    local frame = create("Frame", {
+        Name = "Input_" .. (config.Title or "I"),
+        Size = UDim2.new(1, 0, 0, 32),
+        BackgroundColor3 = T.Element,
+        BackgroundTransparency = 0.3,
+        Parent = tab.Container,
+    })
+    corner(frame, 6)
+
+    create("TextLabel", {
+        Size = UDim2.new(0.45, -12, 1, 0),
+        Position = UDim2.fromOffset(12, 0),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = config.Title or "Input",
+        TextColor3 = T.Text,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame,
+    })
+
+    local box = create("TextBox", {
+        Size = UDim2.new(0.55, -12, 0, 24),
+        Position = UDim2.new(0.45, 0, 0.5, -12),
+        BackgroundColor3 = T.Background,
+        Text = config.Default or "",
+        PlaceholderText = config.Placeholder or "",
+        PlaceholderColor3 = T.SubText,
+        TextColor3 = T.Text,
+        Font = Enum.Font.Gotham,
+        TextSize = 13,
+        ClearTextOnFocus = false,
+        Parent = frame,
+    })
+    corner(box, 4)
+
+    local callback = config.Callback or function() end
+
+    box.FocusLost:Connect(function()
+        callback(box.Text)
+    end)
+
+    return box
+end
+
+-- ============================ SLIDER ============================
+function BBS:AddSlider(tab, config)
+    local T = self.Theme
+    local minV = config.Min or 0
+    local maxV = config.Max or 100
+    local value = config.Default or minV
+    local step = config.Step or 1
+
+    local frame = create("Frame", {
+        Name = "Slider_" .. (config.Title or "S"),
+        Size = UDim2.new(1, 0, 0, 44),
+        BackgroundColor3 = T.Element,
+        BackgroundTransparency = 0.3,
+        Parent = tab.Container,
+    })
+    corner(frame, 6)
+
+    create("TextLabel", {
+        Size = UDim2.new(0.6, -12, 0, 20),
+        Position = UDim2.fromOffset(12, 4),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = config.Title or "Slider",
+        TextColor3 = T.Text,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame,
+    })
+
+    local valueLabel = create("TextLabel", {
+        Size = UDim2.new(0.4, -12, 0, 20),
+        Position = UDim2.new(0.6, 0, 0, 4),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = tostring(value),
+        TextColor3 = T.Accent,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = frame,
+    })
+
+    local sliderBg = create("Frame", {
+        Size = UDim2.new(1, -24, 0, 6),
+        Position = UDim2.new(0, 12, 0, 30),
+        BackgroundColor3 = T.ToggleOff,
+        Parent = frame,
+    })
+    corner(sliderBg, 3)
+
+    local fill = create("Frame", {
+        Size = UDim2.new((value - minV) / (maxV - minV), 0, 1, 0),
+        BackgroundColor3 = T.Accent,
+        Parent = sliderBg,
+    })
+    corner(fill, 3)
+
+    local btn = create("TextButton", {
+        Size = UDim2.new(1, 0, 2, 0),
+        Position = UDim2.new(0, 0, -0.5, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        Parent = sliderBg,
+    })
+
+    local callback = config.Callback or function() end
+    local dragging = false
+
+    local function updateValue(x)
+        local rel = math.clamp((x - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        local raw = minV + (maxV - minV) * rel
+        value = math.floor(raw / step + 0.5) * step
+        value = math.clamp(value, minV, maxV)
+        fill.Size = UDim2.new((value - minV) / (maxV - minV), 0, 1, 0)
+        valueLabel.Text = tostring(value)
+        callback(value)
+    end
+
+    btn.MouseButton1Down:Connect(function()
+        dragging = true
+        updateValue(game:GetService("UserInputService"):GetMouseLocation().X)
+    end)
+
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateValue(input.Position.X)
+        end
+    end)
+
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    return {
+        Set = function(v)
+            value = math.clamp(v, minV, maxV)
+            fill.Size = UDim2.new((value - minV) / (maxV - minV), 0, 1, 0)
+            valueLabel.Text = tostring(value)
+            callback(value)
+        end,
+        Get = function() return value end,
+    }
+end
+
+-- ============================ DROPDOWN ============================
+function BBS:AddDropdown(tab, config)
+    local T = self.Theme
+    local options = config.Values or {}
+    local current = config.Default or options[1]
+    local open = false
+
+    local frame = create("Frame", {
+        Name = "Dropdown_" .. (config.Title or "D"),
+        Size = UDim2.new(1, 0, 0, 32),
+        BackgroundColor3 = T.Element,
+        BackgroundTransparency = 0.3,
+        Parent = tab.Container,
+        ClipsDescendants = false,
+    })
+    corner(frame, 6)
+
+    local btn = create("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        Parent = frame,
+    })
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -40, 1, 0),
+        Position = UDim2.fromOffset(12, 0),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = current,
+        TextColor3 = T.Text,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame,
+    })
+
+    create("TextLabel", {
+        Size = UDim2.fromOffset(20, 20),
+        Position = UDim2.new(1, -28, 0.5, -10),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = "v",
+        TextColor3 = T.SubText,
+        TextSize = 14,
+        Parent = frame,
+    })
+
+    local listFrame = create("Frame", {
+        Name = "List",
+        Size = UDim2.new(1, 0, 0, 0),
+        Position = UDim2.new(0, 0, 1, 4),
+        BackgroundColor3 = T.Background,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 10,
+        Parent = frame,
+    })
+    corner(listFrame, 6)
+    stroke(listFrame, T.Accent, 1)
+
+    local listLayout = create("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = listFrame,
+    })
+
+    local function rebuildList()
+        for _, c in ipairs(listFrame:GetChildren()) do
+            if c:IsA("TextButton") then c:Destroy() end
+        end
+        local y = 0
+        for _, opt in ipairs(options) do
+            local ob = create("TextButton", {
+                Size = UDim2.new(1, 0, 0, 28),
+                Position = UDim2.fromOffset(0, y),
+                BackgroundColor3 = T.Element,
+                BackgroundTransparency = 0.3,
+                Text = "  " .. opt,
+                TextColor3 = T.Text,
+                Font = Enum.Font.Gotham,
+                TextSize = 13,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                LayoutOrder = y,
+                Parent = listFrame,
+            })
+            y = y + 28
+            ob.MouseButton1Click:Connect(function()
+                current = opt
+                btn.Parent:FindFirstChildWhichIsA("TextLabel").Text = opt
+                listFrame.Visible = false
+                listFrame.Size = UDim2.new(1, 0, 0, 0)
+                open = false
+                if config.Callback then config.Callback(opt) end
+            end)
+        end
+        listFrame.Size = UDim2.new(1, 0, 0, #options * 28)
+    end
+
+    rebuildList()
+
+    btn.MouseButton1Click:Connect(function()
+        open = not open
+        listFrame.Visible = open
+    end)
+
+    return {
+        Set = function(v)
+            current = v
+            btn.Parent:FindFirstChildWhichIsA("TextLabel").Text = v
+            if config.Callback then config.Callback(v) end
+        end,
+        Get = function() return current end,
+    }
+end
+
+-- ============================ PARAGRAPH ============================
+function BBS:AddParagraph(tab, config)
+    local T = self.Theme
+    local frame = create("Frame", {
+        Name = "Para_" .. (config.Title or "P"),
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = T.Element,
+        BackgroundTransparency = 0.3,
+        Parent = tab.Container,
+    })
+    corner(frame, 6)
+
+    create("TextLabel", {
+        Size = UDim2.new(1, -16, 0, 16),
+        Position = UDim2.fromOffset(12, 4),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.GothamBold,
+        Text = config.Title or "",
+        TextColor3 = T.Accent,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame,
+    })
+
+    local body = create("TextLabel", {
+        Size = UDim2.new(1, -16, 0, 16),
+        Position = UDim2.fromOffset(12, 20),
+        BackgroundTransparency = 1,
+        Font = Enum.Font.Gotham,
+        Text = config.Content or "",
+        TextColor3 = T.Text,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame,
+    })
+
+    return {
+        Set = function(text)
+            body.Text = text
+        end,
+    }
+end
+
+-- ============================ EXPORT ============================
+getgenv().BBS_UI = getgenv().BBS_UI or {}
+getgenv().BBS_UI.new = BBS.new
+getgenv().BBS_UI.THEMES = THEMES
+getgenv().BBS_UI.THEME_NAMES = {"Amethyst", "Dark", "Light", "Rose", "Ocean", "Blood"}
+
+return BBS
